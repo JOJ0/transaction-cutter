@@ -79,7 +79,7 @@ with open(filename, 'rb') as csvfile:
     writer.writeheader()
     for row in sortedlist:
       #print row['E-Mail Adresse'], row['First Name'], row['Last Name']
-      writer.writerow({'Valutadatum': row['Valutadatum'], 'Umsatzzeit': row['Valutadatum'], 'Betrag': row['Betrag'], 'Buchungstext': row['Buchungstext'], 'Umsatztext': row['Umsatztext']})
+      writer.writerow({'Valutadatum': row['Valutadatum'], 'Umsatzzeit': row['Umsatzzeit'], 'Betrag': row['Betrag'], 'Buchungstext': row['Buchungstext'], 'Umsatztext': row['Umsatztext']})
 
 print "file written: " + str(filename2)
 

@@ -3,7 +3,6 @@
 import sys
 import csv
 import string
-import zipfile
 import pprint
 from subprocess import call
 
@@ -23,14 +22,6 @@ if len(sys.argv) > 1:
     filenamefile=filename.rsplit('/',1)[1]
     filename=filenamepath+"/"+filenamefile
   print ("file used: " + str(filename))
-  #if ".zip" in filename:
-  #  print ("filename contains .zip, extracting "+str(filenamefile)+" to path "+str(filenamepath)+" ...\n")
-  #  with zipfile.ZipFile(filename, "r") as z:
-  #    z.extractall(filenamepath)
-  #    #filename = string.replace(filename, '.zip', '.csv')
-  #    filenamefile = string.replace(filenamefile, '.zip', '.csv')
-  #    filenamefile = "subscribed_"+filenamefile
-  #    filename=filenamepath+"/"+filenamefile
 else:
   print "please provide csv file!"
   raise sys.exit()
@@ -67,7 +58,7 @@ with open(filename, 'rb') as csvfile:
   
 
   # -> using lambda, why te hell was itemgetter necessary??
-  sortedlist = sorted(reader, key=lambda foo: (foo['Umsatzzeit'].lower()), reverse=False)
+  sortedlist = sorted(reader, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
   # debug output sortedlist
   #for row in sortedlist:
     #print row['Valutadatum'], row['Betrag'], row['Buchungstext'], row['Umsatztext']
@@ -75,11 +66,11 @@ with open(filename, 'rb') as csvfile:
   # write new csv file 
   filename2 = string.replace(filename, '.csv', '_slim.csv')
   with open(filename2, 'wb') as csvfile2:
-    writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=['Valutadatum', 'Umsatzzeit', 'Betrag', 'Buchungstext', 'Umsatztext']) 
+    writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']) 
     writer.writeheader()
     for row in sortedlist:
       #print row['E-Mail Adresse'], row['First Name'], row['Last Name']
-      writer.writerow({'Valutadatum': row['Valutadatum'], 'Umsatzzeit': row['Umsatzzeit'], 'Betrag': row['Betrag'], 'Buchungstext': row['Buchungstext'], 'Umsatztext': row['Umsatztext']})
+      writer.writerow({'Umsatzzeit': row['Umsatzzeit'], 'Buchungsdatum': row['Buchungsdatum'], 'Valutadatum': row['Valutadatum'], 'Betrag': row['Betrag'].replace(".", ""), 'Buchungstext': row['Buchungstext'], 'Umsatztext': row['Umsatztext']})
 
 print "file written: " + str(filename2)
 

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 import sys
 import csv
 import string
@@ -6,6 +6,8 @@ import pprint
 from subprocess import call
 import click
 import logging
+from datetime import datetime
+import re
 
 # puts field data to lower case
 def lower_getter(field):
@@ -62,7 +64,8 @@ def csv_slimify(filename, verbose, type, dry_run):
     data = fi.read()
     fi.close()
     fo = open(filename, 'wb')
-    fo.write(data.replace('\x00', ''))
+    #fo.write(data.replace('\x00', ''))
+    fo.write(data.replace(b'\x00', ''))
     fo.close()
 
     # guess csv files dialect?
@@ -77,6 +80,7 @@ def csv_slimify(filename, verbose, type, dry_run):
       csvfile.seek(0)
 
       csv_dict = csv.DictReader(csvfile, dialect=dialect)
+      log.info("csv_dict type is {}".format(csv_dict))
       log.info('csv.DictReader found fields: \n{}\n'.format(csv_dict.fieldnames))
 
       # With debug logging enabled, show how the data actually look like:
@@ -90,8 +94,24 @@ def csv_slimify(filename, verbose, type, dry_run):
       # this is is what we finally want in the output
       output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']
 
+      # format Umsatzzeit so we can use it for sorting
+      # and strip useless spaces in Buchungstext
+      csv_dict_uz_replaced = []
+      for idx,row in enumerate(csv_dict):
+        #log.info('this is csv_dict idx, row: {}, {}'.format(idx, row))
+        csv_dict_uz_replaced.append(row)
+        for item in row.items():
+          if item[0] == 'Umsatzzeit':
+            uz_date_o = datetime.strptime(item[1], '%Y-%m-%d-%H.%M.%S.%f')
+            uz_str = '{} {}'.format(uz_date_o.date(), uz_date_o.time().strftime('%H:%M:%S'))
+            csv_dict_uz_replaced[idx]['Umsatzzeit'] = uz_str
+          if item[0] == 'Umsatztext':
+            #print(item[1])
+            csv_dict_uz_replaced[idx]['Umsatztext'] = re.sub('\s+', ' ', item[1])
+
       # -> using lambda for sorting the list
-      sortedlist = sorted(csv_dict, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
+      sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
+      log.info("sortedlist type is {}".format(sortedlist.__repr__))
 
       # on dry-runs we only output what would be written to csv and exit
       if dry_run:

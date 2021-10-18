@@ -43,113 +43,113 @@ cont_set = dict(help_option_names=['-h', '--help'])
 @click.option('--dry-run', '-n', is_flag=True, default=False,
   help="don't write CSV file, just print data on console")
 def csv_slimify(filename, verbose, format, dry_run):
-    """cuts away unused columns of banking CSV exports."""
-    if verbose == 1:
-        log.handlers[0].setLevel(logging.INFO) # set cli handler to INFO,
-    elif verbose > 1:
-        log.handlers[0].setLevel(logging.DEBUG) # or to DEBUG level
+  """cuts away unused columns of banking CSV exports."""
+  if verbose == 1:
+      log.handlers[0].setLevel(logging.INFO) # set cli handler to INFO,
+  elif verbose > 1:
+      log.handlers[0].setLevel(logging.DEBUG) # or to DEBUG level
 
-    if "/" in filename:
-        filenamepath=filename.rsplit('/',1)[0]
-        filenamefile=filename.rsplit('/',1)[1]
-        filename=filenamepath+"/"+filenamefile
-    print('\nUsing source file "{}"\n'.format(filename))
+  if "/" in filename:
+      filenamepath=filename.rsplit('/',1)[0]
+      filenamefile=filename.rsplit('/',1)[1]
+      filename=filenamepath+"/"+filenamefile
+  print('\nUsing source file "{}"\n'.format(filename))
 
-    # DEBUG dump 1st 200 bytes
-    log.debug("1st 200 bytes...")
-    log.debug(repr(open(filename, 'rb').read(200)))
-    log.debug("\n")
+  # DEBUG dump 1st 200 bytes
+  log.debug("1st 200 bytes...")
+  log.debug(repr(open(filename, 'rb').read(200)))
+  log.debug("\n")
 
-    # Cleanup csv file -> e.g replace NUL characters
-    # Load whole file as bytes into var data.
-    fi = open(filename, 'rb')
-    data = fi.read()
-    fi.close()
-    # Replace stuff and overwrite file.
-    fo = open(filename, 'wb')
+  # Cleanup csv file -> e.g replace NUL characters
+  # Load whole file as bytes into var data.
+  fi = open(filename, 'rb')
+  data = fi.read()
+  fi.close()
+  # Replace stuff and overwrite file.
+  fo = open(filename, 'wb')
+  if format == "vb":
+    data_cleaned_up = data.replace(b'\x00', '')
+  elif format == "pp":
+    data_cleaned_up = data.replace(b'\x00', '')
+    data_cleaned_up = data_cleaned_up.replace(b'\xbb', '')
+    data_cleaned_up = data_cleaned_up.replace(b'\xef', '')
+    data_cleaned_up = data_cleaned_up.replace(b'\xbf', '')
+  fo.write(data_cleaned_up)
+  fo.close()
+
+  # guess csv files dialect?
+  with open(filename, 'rb') as csvfile:
+    dialect = csv.Sniffer().sniff(csvfile.read(1024))
+    log.info('Detected the following details about the "CSV dialect":')
+    log.info('quotechar: {}'.format(dialect.quotechar))
+    log.info('delimiter: {}'.format(dialect.delimiter))
+    log.info('doublequote: {}'.format(dialect.doublequote))
+    log.info("\n")
+    # what's this?? why needed? -> Sets back file handle to beginning of file
+    csvfile.seek(0)
+
+    csv_dict = csv.DictReader(csvfile, dialect=dialect)
+    log.info("csv_dict type is {}".format(csv_dict))
+    log.info('csv.DictReader found fields: \n{}\n'.format(csv_dict.fieldnames))
+
+    # With debug logging enabled, show how the data actually look like:
+    if logging.getLevelName(log.handlers[0].level) == 'DEBUG':
+      print('\nThis is what the source data looks like:\n')
+      for row in csv_dict:
+        pp = pprint.PrettyPrinter(indent=4, depth=1)
+        pp.pprint(row)
+      print('\n\n')
+
+    # this is is what we finally want in the output
     if format == "vb":
-      data_cleaned_up = data.replace(b'\x00', '')
+      output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']
     elif format == "pp":
-      data_cleaned_up = data.replace(b'\x00', '')
-      data_cleaned_up = data_cleaned_up.replace(b'\xbb', '')
-      data_cleaned_up = data_cleaned_up.replace(b'\xef', '')
-      data_cleaned_up = data_cleaned_up.replace(b'\xbf', '')
-    fo.write(data_cleaned_up)
-    fo.close()
+      output_fields = ['Date', 'Time', 'Name', 'Type', 'Currency', 'Gross', 'Fee', 'Net', 'Balance', 'From Email Address', 'To Email Address', 'Item Title', 'Town/City']
 
-    # guess csv files dialect?
-    with open(filename, 'rb') as csvfile:
-      dialect = csv.Sniffer().sniff(csvfile.read(1024))
-      log.info('Detected the following details about the "CSV dialect":')
-      log.info('quotechar: {}'.format(dialect.quotechar))
-      log.info('delimiter: {}'.format(dialect.delimiter))
-      log.info('doublequote: {}'.format(dialect.doublequote))
-      log.info("\n")
-      # what's this?? why needed? -> Sets back file handle to beginning of file
-      csvfile.seek(0)
+    # format Umsatzzeit so we can use it for sorting
+    # and strip useless spaces in Buchungstext
+    csv_dict_uz_replaced = []
+    for idx,row in enumerate(csv_dict):
+      #log.info('this is csv_dict idx, row: {}, {}'.format(idx, row))
+      csv_dict_uz_replaced.append(row)
+      for item in row.items():
+        if item[0] == 'Umsatzzeit':
+          uz_date_o = datetime.strptime(item[1], '%Y-%m-%d-%H.%M.%S.%f')
+          uz_str = '{} {}'.format(uz_date_o.date(), uz_date_o.time().strftime('%H:%M:%S'))
+          csv_dict_uz_replaced[idx]['Umsatzzeit'] = uz_str
+        if item[0] == 'Umsatztext':
+          #print(item[1])
+          csv_dict_uz_replaced[idx]['Umsatztext'] = re.sub('\s+', ' ', item[1])
 
-      csv_dict = csv.DictReader(csvfile, dialect=dialect)
-      log.info("csv_dict type is {}".format(csv_dict))
-      log.info('csv.DictReader found fields: \n{}\n'.format(csv_dict.fieldnames))
+    # -> using lambda for sorting the list
+    if format == "vb":
+      sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
+    elif format == "pp":
+      sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Date'].lower()), reverse=False)
+    log.info("sortedlist type is {}".format(sortedlist.__repr__))
 
-      # With debug logging enabled, show how the data actually look like:
-      if logging.getLevelName(log.handlers[0].level) == 'DEBUG':
-        print('\nThis is what the source data looks like:\n')
-        for row in csv_dict:
-          pp = pprint.PrettyPrinter(indent=4, depth=1)
-          pp.pprint(row)
-        print('\n\n')
-
-      # this is is what we finally want in the output
-      if format == "vb":
-        output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']
-      elif format == "pp":
-        output_fields = ['Date', 'Time', 'Name', 'Type', 'Currency', 'Gross', 'Fee', 'Net', 'Balance', 'From Email Address', 'To Email Address', 'Item Title', 'Town/City']
-
-      # format Umsatzzeit so we can use it for sorting
-      # and strip useless spaces in Buchungstext
-      csv_dict_uz_replaced = []
-      for idx,row in enumerate(csv_dict):
-        #log.info('this is csv_dict idx, row: {}, {}'.format(idx, row))
-        csv_dict_uz_replaced.append(row)
+    # on dry-runs we only output what would be written to csv and exit
+    if dry_run:
+      print(output_fields)
+      for row in sortedlist:
+        row_str = ''
         for item in row.items():
-          if item[0] == 'Umsatzzeit':
-            uz_date_o = datetime.strptime(item[1], '%Y-%m-%d-%H.%M.%S.%f')
-            uz_str = '{} {}'.format(uz_date_o.date(), uz_date_o.time().strftime('%H:%M:%S'))
-            csv_dict_uz_replaced[idx]['Umsatzzeit'] = uz_str
-          if item[0] == 'Umsatztext':
-            #print(item[1])
-            csv_dict_uz_replaced[idx]['Umsatztext'] = re.sub('\s+', ' ', item[1])
+          row_str+= '| {} '.format(item[1])
+        print('{}\n'.format(row_str))
+      print('FIXME: Above fields are in the wrong order, this is what we finally want:')
+      print(output_fields)
+      print('\n\n')
+      raise(SystemExit(0))
 
-      # -> using lambda for sorting the list
-      if format == "vb":
-        sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
-      elif format == "pp":
-        sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Date'].lower()), reverse=False)
-      log.info("sortedlist type is {}".format(sortedlist.__repr__))
+    # write new csv file
+    filename2 = string.replace(filename, '.csv', '_slim.csv')
+    with open(filename2, 'wb') as csvfile2:
+      writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=output_fields)
+      writer.writeheader()
+      for row in sortedlist:
+        writer.writerow({'Umsatzzeit': row['Umsatzzeit'], 'Buchungsdatum': row['Buchungsdatum'], 'Valutadatum': row['Valutadatum'], 'Betrag': row['Betrag'].replace(".", ""), 'Buchungstext': row['Buchungstext'], 'Umsatztext': row['Umsatztext']})
 
-      # on dry-runs we only output what would be written to csv and exit
-      if dry_run:
-        print(output_fields)
-        for row in sortedlist:
-          row_str = ''
-          for item in row.items():
-            row_str+= '| {} '.format(item[1])
-          print('{}\n'.format(row_str))
-        print('FIXME: Above fields are in the wrong order, this is what we finally want:')
-        print(output_fields)
-        print('\n\n')
-        raise(SystemExit(0))
-
-      # write new csv file
-      filename2 = string.replace(filename, '.csv', '_slim.csv')
-      with open(filename2, 'wb') as csvfile2:
-        writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=output_fields)
-        writer.writeheader()
-        for row in sortedlist:
-          writer.writerow({'Umsatzzeit': row['Umsatzzeit'], 'Buchungsdatum': row['Buchungsdatum'], 'Valutadatum': row['Valutadatum'], 'Betrag': row['Betrag'].replace(".", ""), 'Buchungstext': row['Buchungstext'], 'Umsatztext': row['Umsatztext']})
-
-    print("File slimified: {}\n".format(filename2))
+  print("File slimified: {}\n".format(filename2))
 
 if __name__ == '__main__':
-    csv_slimify()
+  csv_slimify()

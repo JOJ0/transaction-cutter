@@ -36,12 +36,13 @@ cont_set = dict(help_option_names=['-h', '--help'])
 @click.command(context_settings=cont_set)
 @click.argument('filename')
 @click.option('--verbose', '-v', count=True, default=False,
-      help="enable INFO (-v) or DEBUG (-vv) logging on console")
-@click.option('--type', '-t', type=click.Choice(['vb', 'pp']), default="vb",
-    help="which type of CSV modification?",)
+  help="enable INFO (-v) or DEBUG (-vv) logging on console")
+@click.option('--type', '-t', "format",
+  type=click.Choice(['vb', 'pp']), default="vb",
+  help="which type of CSV modification?",)
 @click.option('--dry-run', '-n', is_flag=True, default=False,
-      help="don't write CSV file, just print data on console")
-def csv_slimify(filename, verbose, type, dry_run):
+  help="don't write CSV file, just print data on console")
+def csv_slimify(filename, verbose, format, dry_run):
     """cuts away unused columns of banking CSV exports."""
     if verbose == 1:
         log.handlers[0].setLevel(logging.INFO) # set cli handler to INFO,
@@ -55,17 +56,25 @@ def csv_slimify(filename, verbose, type, dry_run):
     print('\nUsing source file "{}"\n'.format(filename))
 
     # DEBUG dump 1st 200 bytes
-    log.debug("### DEBUG: 1st 200 bytes... ###")
+    log.debug("1st 200 bytes...")
     log.debug(repr(open(filename, 'rb').read(200)))
     log.debug("\n")
 
-    # cleanup csv file -> replace NUL characters
+    # Cleanup csv file -> e.g replace NUL characters
+    # Load whole file as bytes into var data.
     fi = open(filename, 'rb')
     data = fi.read()
     fi.close()
+    # Replace stuff and overwrite file.
     fo = open(filename, 'wb')
-    #fo.write(data.replace('\x00', ''))
-    fo.write(data.replace(b'\x00', ''))
+    if format == "vb":
+      data_cleaned_up = data.replace(b'\x00', '')
+    elif format == "pp":
+      data_cleaned_up = data.replace(b'\x00', '')
+      data_cleaned_up = data_cleaned_up.replace(b'\xbb', '')
+      data_cleaned_up = data_cleaned_up.replace(b'\xef', '')
+      data_cleaned_up = data_cleaned_up.replace(b'\xbf', '')
+    fo.write(data_cleaned_up)
     fo.close()
 
     # guess csv files dialect?
@@ -92,7 +101,10 @@ def csv_slimify(filename, verbose, type, dry_run):
         print('\n\n')
 
       # this is is what we finally want in the output
-      output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']
+      if format == "vb":
+        output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']
+      elif format == "pp":
+        output_fields = ['Date', 'Time', 'Name', 'Type', 'Currency', 'Gross', 'Fee', 'Net', 'Balance', 'From Email Address', 'To Email Address', 'Item Title', 'Town/City']
 
       # format Umsatzzeit so we can use it for sorting
       # and strip useless spaces in Buchungstext
@@ -110,7 +122,10 @@ def csv_slimify(filename, verbose, type, dry_run):
             csv_dict_uz_replaced[idx]['Umsatztext'] = re.sub('\s+', ' ', item[1])
 
       # -> using lambda for sorting the list
-      sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
+      if format == "vb":
+        sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
+      elif format == "pp":
+        sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Date'].lower()), reverse=False)
       log.info("sortedlist type is {}".format(sortedlist.__repr__))
 
       # on dry-runs we only output what would be written to csv and exit

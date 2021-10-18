@@ -77,7 +77,7 @@ def csv_slimify(filename, verbose, format, dry_run):
     fo.write(data_cleaned_up)
     fo.close()
 
-    # guess csv files dialect?
+    # Guess csv files dialect and open file context
     with open(filename, 'rb') as csvfile:
         dialect = csv.Sniffer().sniff(csvfile.read(1024))
         log.info('Detected the following details about the "CSV dialect":')
@@ -106,7 +106,7 @@ def csv_slimify(filename, verbose, format, dry_run):
         elif format == "pp":
             output_fields = ['Date', 'Time', 'Name', 'Type', 'Currency', 'Gross', 'Fee', 'Net', 'Balance', 'From Email Address', 'To Email Address', 'Item Title', 'Town/City']
 
-        # format Umsatzzeit so we can use it for sorting
+        # Format Umsatzzeit so we can use it for sorting
         # and strip useless spaces in Buchungstext
         csv_dict_uz_replaced = []
         for idx,row in enumerate(csv_dict):
@@ -121,27 +121,27 @@ def csv_slimify(filename, verbose, format, dry_run):
                     #print(item[1])
                     csv_dict_uz_replaced[idx]['Umsatztext'] = re.sub('\s+', ' ', item[1])
 
-        # -> using lambda for sorting the list
+        # Sort the list
         if format == "vb":
             sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
         elif format == "pp":
             sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Date'].lower()), reverse=False)
-        log.info("sortedlist type is {}".format(sortedlist.__repr__))
+        log.info("sortedlist type is {}\n".format(sortedlist.__repr__))
 
-        # on dry-runs we only output what would be written to csv and exit
+        # On dry-runs we only output what would be written to csv and exit
         if dry_run:
-            print(output_fields)
             for row in sortedlist:
                 row_str = ''
                 for item in row.items():
                     row_str+= '| {} '.format(item[1])
                 print('{}\n'.format(row_str))
-            print('FIXME: Above fields are in the wrong order, this is what we finally want:')
+            print("FIXME: Above fields are in the wrong order, this is what "
+                  "we'll actually get:")
             print(output_fields)
-            print('\n\n')
+            print("\n\n")
             raise(SystemExit(0))
 
-        # write new csv file
+        # Write new csv file
         filename2 = string.replace(filename, '.csv', '_slim.csv')
         with open(filename2, 'wb') as csvfile2:
             writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=output_fields)

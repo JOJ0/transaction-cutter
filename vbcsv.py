@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 import sys
 import csv
 import string
@@ -60,7 +60,7 @@ def csv_slimify(filename, verbose, format, dry_run):
     log.debug(repr(open(filename, 'rb').read(200)))
     log.debug("\n")
 
-    # Cleanup csv file -> e.g replace NUL characters
+    # Cleanup source file -> e.g replace NUL characters
     # Load whole file as bytes into var data.
     fi = open(filename, 'rb')
     data = fi.read()
@@ -68,26 +68,28 @@ def csv_slimify(filename, verbose, format, dry_run):
     # Replace stuff and overwrite file.
     fo = open(filename, 'wb')
     if format == "vb":
-        data_cleaned_up = data.replace(b'\x00', '')
+        data_cleaned_up = data.replace(b'\x00', b'')
     elif format == "pp":
-        data_cleaned_up = data.replace(b'\x00', '')
-        data_cleaned_up = data_cleaned_up.replace(b'\xbb', '')
-        data_cleaned_up = data_cleaned_up.replace(b'\xef', '')
-        data_cleaned_up = data_cleaned_up.replace(b'\xbf', '')
+        data_cleaned_up = data.replace(b'\x00', b'')
+        data_cleaned_up = data_cleaned_up.replace(b'\xbb', b'')
+        data_cleaned_up = data_cleaned_up.replace(b'\xef', b'')
+        data_cleaned_up = data_cleaned_up.replace(b'\xbf', b'')
     fo.write(data_cleaned_up)
     fo.close()
 
-    # Guess csv files dialect and open file context
-    with open(filename, 'rb') as csvfile:
-        dialect = csv.Sniffer().sniff(csvfile.read(1024))
-        log.info('Detected the following details about the "CSV dialect":')
+    # Guess CSV dialect and open file context.
+    with open(filename, 'r', newline='\n') as csvfile:
+        dialect = csv.Sniffer().sniff(
+            csvfile.read(1024), delimiters=[',', ';']
+        )
+        log.info('Detected details about "CSV dialect":')
         log.info('quotechar: {}'.format(dialect.quotechar))
         log.info('delimiter: {}'.format(dialect.delimiter))
-        log.info('doublequote: {}'.format(dialect.doublequote))
-        log.info("\n")
-        # what's this?? why needed? -> Sets back file handle to beginning of file
-        csvfile.seek(0)
+        log.info('doublequote: {}\n'.format(dialect.doublequote))
 
+        # Set back file handle to beginning of file
+        csvfile.seek(0)
+        # Load contents into OrderedDict (Py3.6) or dict (Py3.8) object.
         csv_dict = csv.DictReader(csvfile, dialect=dialect)
         log.info("csv_dict type is {}".format(csv_dict))
         log.info('csv.DictReader found fields: \n{}\n'.format(csv_dict.fieldnames))
@@ -104,29 +106,74 @@ def csv_slimify(filename, verbose, format, dry_run):
         if format == "vb":
             output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']
         elif format == "pp":
-            output_fields = ['Date', 'Time', 'Name', 'Type', 'Currency', 'Gross', 'Fee', 'Net', 'Balance', 'From Email Address', 'To Email Address', 'Item Title', 'Town/City']
+            # interesting_original_fields = [
+            #     'Date', 'Time', 'Name', 'Type', 'Currency', 'Gross', 'Fee',
+            #     'Net', 'Balance', 'From Email Address', 'To Email Address',
+            #     'Item Title', 'Town/City'
+            # ]
+            output_fields = [
+                'DateTime', 'Description',
+                'Currency', 'Gross', 'Fee', 'Net', 'Balance'
+            ]
 
-        # Format Umsatzzeit so we can use it for sorting
-        # and strip useless spaces in Buchungstext
-        csv_dict_uz_replaced = []
-        for idx,row in enumerate(csv_dict):
-            #log.info('this is csv_dict idx, row: {}, {}'.format(idx, row))
-            csv_dict_uz_replaced.append(row)
-            for item in row.items():
-                if item[0] == 'Umsatzzeit':
-                    uz_date_o = datetime.strptime(item[1], '%Y-%m-%d-%H.%M.%S.%f')
-                    uz_str = '{} {}'.format(uz_date_o.date(), uz_date_o.time().strftime('%H:%M:%S'))
-                    csv_dict_uz_replaced[idx]['Umsatzzeit'] = uz_str
-                if item[0] == 'Umsatztext':
-                    #print(item[1])
-                    csv_dict_uz_replaced[idx]['Umsatztext'] = re.sub('\s+', ' ', item[1])
-
-        # Sort the list
         if format == "vb":
-            sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
+            # Format Umsatzzeit so we can use it for sorting
+            # and strip useless spaces in Buchungstext
+            csv_dict_mod = []
+            for idx, row in enumerate(csv_dict):
+                # print('This is csv_dict idx, row: {}, {}\n'.format(idx, row))
+                csv_dict_mod.append(row)
+                for item in row.items():
+                    if item[0] == 'Umsatzzeit':
+                        uz_date_o = datetime.strptime(item[1], '%Y-%m-%d-%H.%M.%S.%f')
+                        uz_str = '{} {}'.format(uz_date_o.date(), uz_date_o.time().strftime('%H:%M:%S'))
+                        csv_dict_mod[idx]['Umsatzzeit'] = uz_str
+                    if item[0] == 'Buchungstext':
+                        #print(item[1])
+                        csv_dict_mod[idx]['Buchungstext'] = re.sub('\s+', ' ', item[1])
         elif format == "pp":
-            sortedlist = sorted(csv_dict_uz_replaced, key=lambda foo: (foo['Date'].lower()), reverse=False)
-        log.info("sortedlist type is {}\n".format(sortedlist.__repr__))
+            csv_dict_mod = []
+            for idx, row in enumerate(csv_dict):
+                # print('This is csv_dict idx, row: {}, {}\n'.format(idx, row))
+                new_row = {
+                    'DateTime': '',
+                    'Description': '',
+                    'Currency': '',
+                    'Gross': '',
+                    'Fee': '',
+                    'Net': '',
+                    'Balance': ''
+                }
+                for col, value in row.items():
+                    # Merge Date/Time, keep currency related as-is and put the
+                    # rest into a Description col.
+                    if col == "Date":  
+                        new_row['DateTime'] = "".join([new_row['DateTime'], value])
+                    elif col == "Time":
+                        new_row['DateTime'] = " ".join([new_row['DateTime'], value])
+                    elif col in ["Currency", "Gross", "Fee", "Net", "Balance"]:
+                        new_row[col] = value
+                    else:
+                        if new_row['Description'] == "":
+                            delim = ""  # No delimitier if still empty
+                        else:
+                            delim = " / "
+                        new_row['Description'] = delim.join([new_row['Description'], value])
+                csv_dict_mod.append(new_row)
+
+        log.info("csv_dict_mod type is {}\n".format(type(csv_dict_mod)))
+
+        # Sort the list. Actually sortedlist is a list of dicts.
+        if format == "vb":
+            sortedlist = sorted(csv_dict_mod, key=lambda foo: (foo['Valutadatum'].lower()), reverse=False)
+        elif format == "pp":
+            sortedlist = sorted(csv_dict_mod, key=lambda foo: (foo['DateTime'].lower()), reverse=False)
+
+        #has_childs = "Yes" if isinstance(sortedlist[0], dict) else ""
+        #log.info("sortedlist has childs? {}\n".format(has_childs))
+        #log.info("sortedlist type is {} and contains {}\n".format(
+        #    type(sortedlist), type(sortedlist[0])
+        #))
 
         # On dry-runs we only output what would be written to csv and exit
         if dry_run:
@@ -142,8 +189,8 @@ def csv_slimify(filename, verbose, format, dry_run):
             raise(SystemExit(0))
 
         # Write new csv file
-        filename2 = string.replace(filename, '.csv', '_slim.csv')
-        with open(filename2, 'wb') as csvfile2:
+        filename2 = filename.replace('.csv', '_slim.csv')
+        with open(filename2, 'w') as csvfile2:
             writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=output_fields)
             writer.writeheader()
             for row in sortedlist:
@@ -158,15 +205,13 @@ def csv_slimify(filename, verbose, format, dry_run):
                     })
                 elif format == "pp":
                     writer.writerow({
-                        'Date': "/".join([
-                            row['Date'],
-                            row['Time']
-                        ]),
-                        'Name': "/".join([
-                            row['Name'],
-                            row['Type'],
-                            row['Currency']
-                        ])
+                        output_fields[0]: row[output_fields[0]],
+                        output_fields[1]: row[output_fields[1]],
+                        output_fields[2]: row[output_fields[2]],
+                        output_fields[3]: row[output_fields[3]],
+                        output_fields[4]: row[output_fields[4]],
+                        output_fields[5]: row[output_fields[5]],
+                        output_fields[6]: row[output_fields[6]],
                     })
 
     print("File slimified: {}\n".format(filename2))

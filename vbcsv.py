@@ -87,7 +87,7 @@ def csv_slimify(filename, verbose, format, dry_run):
         log.info('delimiter: {}'.format(dialect.delimiter))
         log.info('doublequote: {}\n'.format(dialect.doublequote))
 
-        # Set back file handle to beginning of file
+        # Set back file handle to beginning of file.
         csvfile.seek(0)
         # Load contents into OrderedDict (Py3.6) or dict (Py3.8) object.
         csv_dict = csv.DictReader(csvfile, dialect=dialect)
@@ -102,47 +102,48 @@ def csv_slimify(filename, verbose, format, dry_run):
                 pp.pprint(row)
             print('\n\n')
 
-        # this is is what we finally want in the output
+        # The cols we want in the output.
         if format == "vb":
-            output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum', 'Betrag', 'Buchungstext', 'Umsatztext']
+            output_fields = ['Umsatzzeit', 'Buchungsdatum', 'Valutadatum',
+                             'Betrag', 'Buchungstext', 'Umsatztext']
         elif format == "pp":
             # interesting_original_fields = [
             #     'Date', 'Time', 'Name', 'Type', 'Currency', 'Gross', 'Fee',
             #     'Net', 'Balance', 'From Email Address', 'To Email Address',
             #     'Item Title', 'Town/City'
             # ]
-            output_fields = [
-                'DateTime', 'Description',
-                'Currency', 'Gross', 'Fee', 'Net', 'Balance'
-            ]
+            output_fields = ['DateTime', 'Description',
+                             'Currency', 'Gross', 'Fee', 'Net', 'Balance']
 
         if format == "vb":
-            # Format Umsatzzeit so we can use it for sorting
-            # and strip useless spaces in Buchungstext
+            # Format Umsatzzeit so we can use it for sorting and strip useless
+            # spaces in Buchungstext. Currently this code is unused and we sort
+            # via Valutadatum still, since it's the closest to reality.
             csv_dict_mod = []
             for idx, row in enumerate(csv_dict):
                 # print('This is csv_dict idx, row: {}, {}\n'.format(idx, row))
                 csv_dict_mod.append(row)
                 for item in row.items():
                     if item[0] == 'Umsatzzeit':
-                        uz_date_o = datetime.strptime(item[1], '%Y-%m-%d-%H.%M.%S.%f')
-                        uz_str = '{} {}'.format(uz_date_o.date(), uz_date_o.time().strftime('%H:%M:%S'))
+                        uz_date_o = datetime.strptime(
+                            item[1], '%Y-%m-%d-%H.%M.%S.%f'
+                        )
+                        uz_str = '{} {}'.format(
+                            uz_date_o.date(),
+                            uz_date_o.time().strftime('%H:%M:%S')
+                        )
                         csv_dict_mod[idx]['Umsatzzeit'] = uz_str
                     if item[0] == 'Buchungstext':
-                        #print(item[1])
-                        csv_dict_mod[idx]['Buchungstext'] = re.sub('\s+', ' ', item[1])
+                        csv_dict_mod[idx]['Buchungstext'] = re.sub(
+                            '\s+', ' ', item[1]
+                        )
         elif format == "pp":
             csv_dict_mod = []
             for idx, row in enumerate(csv_dict):
                 # print('This is csv_dict idx, row: {}, {}\n'.format(idx, row))
                 new_row = {
-                    'DateTime': '',
-                    'Description': '',
-                    'Currency': '',
-                    'Gross': '',
-                    'Fee': '',
-                    'Net': '',
-                    'Balance': ''
+                    'DateTime': '', 'Description': '', 'Currency': '',
+                    'Gross': '', 'Fee': '', 'Net': '', 'Balance': ''
                 }
                 for col, value in row.items():
                     # Merge Date/Time, keep currency related as-is and put the
@@ -175,7 +176,7 @@ def csv_slimify(filename, verbose, format, dry_run):
         #    type(sortedlist), type(sortedlist[0])
         #))
 
-        # On dry-runs we only output what would be written to csv and exit
+        # On dry-runs we only output what would be written to csv and exit.
         if dry_run:
             for row in sortedlist:
                 row_str = ''
@@ -188,7 +189,7 @@ def csv_slimify(filename, verbose, format, dry_run):
             print("\n\n")
             raise(SystemExit(0))
 
-        # Write new csv file
+        # Write new CSV file and call it originalname_slim.csv.
         filename2 = filename.replace('.csv', '_slim.csv')
         with open(filename2, 'w') as csvfile2:
             writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=output_fields)

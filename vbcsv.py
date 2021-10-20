@@ -160,6 +160,9 @@ def csv_slimify(filename, verbose, format, dry_run):
                     # Keep currency related as-is.
                     elif col in ["Currency", "Gross", "Fee", "Net", "Balance"]:
                         new_row[col] = value
+                    # Ignore timezone col.
+                    elif col in ["Timezone"]:
+                        continue
                     # Put all the rest into a Description col.
                     else:
                         if new_row['Description'] == "":

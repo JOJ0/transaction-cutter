@@ -152,6 +152,10 @@ def csv_slimify(filename, verbose, format, dry_run):
                         new_row['DateTime'] = "".join([new_row['DateTime'], value])
                     elif col == "Time":
                         new_row['DateTime'] = " ".join([new_row['DateTime'], value])
+                        datetime_o = datetime.strptime(
+                            new_row['DateTime'], '%d/%m/%Y %H:%M:%S'
+                        )
+                        new_row['DateTime'] = datetime_o.strftime('%Y-%m-%d %H:%M:%S')
                     elif col in ["Currency", "Gross", "Fee", "Net", "Balance"]:
                         new_row[col] = value
                     else:

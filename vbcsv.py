@@ -82,7 +82,7 @@ def csv_slimify(filename, verbose, format, dry_run):
         dialect = csv.Sniffer().sniff(
             csvfile.read(1024), delimiters=[',', ';']
         )
-        log.info('Detected details about "CSV dialect":')
+        log.info('Detected CSV dialect:')
         log.info('quotechar: {}'.format(dialect.quotechar))
         log.info('delimiter: {}'.format(dialect.delimiter))
         log.info('doublequote: {}\n'.format(dialect.doublequote))
@@ -112,8 +112,8 @@ def csv_slimify(filename, verbose, format, dry_run):
             #     'Net', 'Balance', 'From Email Address', 'To Email Address',
             #     'Item Title', 'Town/City'
             # ]
-            output_fields = ['DateTime', 'Description',
-                             'Currency', 'Gross', 'Fee', 'Net', 'Balance']
+            output_fields = ['Date', 'Time', 'Currency', 'Gross',
+                             'Fee', 'Net', 'Balance', 'Description', 'DateTime']
 
         if format == "vb":
             # Format Umsatzzeit so we can use it for sorting and strip useless
@@ -141,29 +141,35 @@ def csv_slimify(filename, verbose, format, dry_run):
             csv_dict_mod = []
             for idx, row in enumerate(csv_dict):
                 # print('This is csv_dict idx, row: {}, {}\n'.format(idx, row))
-                new_row = {
-                    'DateTime': '', 'Description': '', 'Currency': '',
-                    'Gross': '', 'Fee': '', 'Net': '', 'Balance': ''
-                }
+                # Empty string as a default for new_row items.
+                new_row = {field: '' for field in output_fields}
                 for col, value in row.items():
-                    # Merge Date/Time, keep currency related as-is and put the
-                    # rest into a Description col.
+                    # Merge Date/Time, translate to standard format, then write
+                    # to separate fields again. Date field must be first in
+                    # original data!
                     if col == "Date":  
                         new_row['DateTime'] = "".join([new_row['DateTime'], value])
                     elif col == "Time":
-                        new_row['DateTime'] = " ".join([new_row['DateTime'], value])
+                        datetime_merged = " ".join([new_row['DateTime'], value])
                         datetime_o = datetime.strptime(
-                            new_row['DateTime'], '%d/%m/%Y %H:%M:%S'
+                            datetime_merged, '%d/%m/%Y %H:%M:%S'
                         )
                         new_row['DateTime'] = datetime_o.strftime('%Y-%m-%d %H:%M:%S')
+                        new_row['Date'] = datetime_o.strftime('%Y-%m-%d')
+                        new_row['Time'] = datetime_o.strftime('%H:%M:%S')
+                    # Keep currency related as-is.
                     elif col in ["Currency", "Gross", "Fee", "Net", "Balance"]:
                         new_row[col] = value
+                    # Put all the rest into a Description col.
                     else:
                         if new_row['Description'] == "":
                             delim = ""  # No delimitier if still empty
                         else:
                             delim = " / "
-                        new_row['Description'] = delim.join([new_row['Description'], value])
+                        if value != '':  # Only add non-empty fields.
+                            new_row['Description'] = delim.join(
+                                [new_row['Description'], value]
+                            )
                 csv_dict_mod.append(new_row)
 
         log.info("csv_dict_mod type is {}\n".format(type(csv_dict_mod)))
@@ -174,11 +180,9 @@ def csv_slimify(filename, verbose, format, dry_run):
         elif format == "pp":
             sortedlist = sorted(csv_dict_mod, key=lambda foo: (foo['DateTime'].lower()), reverse=False)
 
-        #has_childs = "Yes" if isinstance(sortedlist[0], dict) else ""
-        #log.info("sortedlist has childs? {}\n".format(has_childs))
-        #log.info("sortedlist type is {} and contains {}\n".format(
-        #    type(sortedlist), type(sortedlist[0])
-        #))
+        # log.info("sortedlist type is {} and contains {}\n".format(
+        #     type(sortedlist), type(sortedlist[0])
+        # ))
 
         # On dry-runs we only output what would be written to csv and exit.
         if dry_run:
@@ -210,13 +214,7 @@ def csv_slimify(filename, verbose, format, dry_run):
                     })
                 elif format == "pp":
                     writer.writerow({
-                        output_fields[0]: row[output_fields[0]],
-                        output_fields[1]: row[output_fields[1]],
-                        output_fields[2]: row[output_fields[2]],
-                        output_fields[3]: row[output_fields[3]],
-                        output_fields[4]: row[output_fields[4]],
-                        output_fields[5]: row[output_fields[5]],
-                        output_fields[6]: row[output_fields[6]],
+                        col: row[col] for col in output_fields
                     })
 
     print("File slimified: {}\n".format(filename2))

@@ -147,7 +147,27 @@ def csv_slimify(filename, verbose, format, dry_run):
             writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=output_fields)
             writer.writeheader()
             for row in sortedlist:
-                writer.writerow({'Umsatzzeit': row['Umsatzzeit'], 'Buchungsdatum': row['Buchungsdatum'], 'Valutadatum': row['Valutadatum'], 'Betrag': row['Betrag'].replace(".", ""), 'Buchungstext': row['Buchungstext'], 'Umsatztext': row['Umsatztext']})
+                if format == "vb":
+                    writer.writerow({
+                        'Umsatzzeit': row['Umsatzzeit'],
+                        'Buchungsdatum': row['Buchungsdatum'],
+                        'Valutadatum': row['Valutadatum'],
+                        'Betrag': row['Betrag'].replace(".", ""),
+                        'Buchungstext': row['Buchungstext'],
+                        'Umsatztext': row['Umsatztext']
+                    })
+                elif format == "pp":
+                    writer.writerow({
+                        'Date': "/".join([
+                            row['Date'],
+                            row['Time']
+                        ]),
+                        'Name': "/".join([
+                            row['Name'],
+                            row['Type'],
+                            row['Currency']
+                        ])
+                    })
 
     print("File slimified: {}\n".format(filename2))
 

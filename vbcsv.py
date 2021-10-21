@@ -78,7 +78,7 @@ def csv_slimify(filename, verbose, format, dry_run):
     fo.close()
 
     # Guess CSV dialect and open file context.
-    with open(filename, 'r', newline='\n') as csvfile:
+    with open(filename, 'r') as csvfile:
         dialect = csv.Sniffer().sniff(
             csvfile.read(1024), delimiters=[',', ';']
         )

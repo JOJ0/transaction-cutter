@@ -78,7 +78,8 @@ def csv_slimify(filename, verbose, format, dry_run):
     fo.close()
 
     # Guess CSV dialect and open file context.
-    with open(filename, 'r') as csvfile:
+    encoding = "iso-8859-1" if format == "vb" else "utf-8"
+    with open(filename, 'r', encoding=encoding) as csvfile:
         dialect = csv.Sniffer().sniff(
             csvfile.read(1024), delimiters=[',', ';']
         )

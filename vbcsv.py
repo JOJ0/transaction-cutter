@@ -124,19 +124,15 @@ def csv_slimify(filename, verbose, format, dry_run):
             for idx, row in enumerate(csv_dict):
                 # print('This is csv_dict idx, row: {}, {}\n'.format(idx, row))
                 csv_dict_mod.append(row)
-                for item in row.items():
-                    if item[0] == 'Umsatzzeit':
-                        uz_date_o = datetime.strptime(
-                            item[1], '%Y-%m-%d-%H.%M.%S.%f'
-                        )
-                        uz_str = '{} {}'.format(
-                            uz_date_o.date(),
-                            uz_date_o.time().strftime('%H:%M:%S')
-                        )
-                        csv_dict_mod[idx]['Umsatzzeit'] = uz_str
-                    if item[0] == 'Buchungstext':
-                        csv_dict_mod[idx]['Buchungstext'] = re.sub(
-                            '\s+', ' ', item[1]
+                for col, value in row.items():
+                    if col == 'Umsatzzeit':
+                        date_time = datetime.strptime(
+                            value, '%Y-%m-%d-%H.%M.%S.%f'
+                        ).strftime('%Y-%m-%d %H:%M:%S')
+                        csv_dict_mod[idx][col] = date_time
+                    if col == 'Umsatztext':
+                        csv_dict_mod[idx][col] = re.sub(
+                            '\s+', ' ', value
                         )
         elif format == "pp":
             csv_dict_mod = []

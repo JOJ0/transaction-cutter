@@ -166,9 +166,11 @@ def csv_slimify(filename, verbose, format, dry_run):
                             delim = ""  # No delimitier if still empty
                         else:
                             delim = " / "
-                        if value != '':  # Only add non-empty fields.
+                        # Only add non-empty fields. Make sure value is always
+                        # handled as a string.
+                        if value:
                             new_row['Description'] = delim.join(
-                                [new_row['Description'], value]
+                                [new_row['Description'], str(value)]
                             )
                 csv_dict_mod.append(new_row)
 

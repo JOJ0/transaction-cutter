@@ -202,7 +202,10 @@ def csv_slimify(filename, verbose, format, dry_run):
         # Write new CSV file and call it originalname_slim.csv.
         filename2 = filename.replace('.csv', '_slim.csv')
         with open(filename2, 'w') as csvfile2:
-            writer = csv.DictWriter(csvfile2, dialect=dialect, fieldnames=output_fields)
+            writer = csv.DictWriter(
+                csvfile2, dialect=dialect, fieldnames=output_fields,
+                escapechar='\\'
+            )
             writer.writeheader()
             for row in sortedlist:
                 writer.writerow({
